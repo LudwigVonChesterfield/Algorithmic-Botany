@@ -11,7 +11,7 @@
 
 public static class Compatibility_Functions
 {
-  public static float signum(float f)
+  public static float signum(float f)f
   {
     // Use the pair of these to imply that code in this commented block
     // Should be uncommented after parsing.
