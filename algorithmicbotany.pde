@@ -1,3 +1,5 @@
+import peasy.*;
+
 ArrayList<Tree> trees = new ArrayList<Tree>();
 
 ArrayList<PhysicsObj> processees = new ArrayList<PhysicsObj>();
@@ -22,6 +24,7 @@ float mouse_acc_y = 0.05;
 
 float wind_acc_x = 0.0;
 float wind_acc_y = 0.0;
+float wind_acc_z = 10.0;
 
 int max_grown_times = 10; // Default: 10.
 int min_grown_length = 8; // Default: 8.
@@ -49,10 +52,14 @@ Tree tree;
 Sun sun;
 Moon moon;
 
+PeasyCam cam;
+
 void setup()
 {
-  size(800, 800);
+  size(800, 800, P3D);
   colorMode(HSB, 360.0, 100.0, 100.0, 100.0);
+
+  cam = new PeasyCam(this, 800);
 
   hs1 = new HScrollbar(0, 12, width, 16, 16, true);
   hs2 = new HScrollbar(0, 34, width, 16, 16, true);
@@ -74,12 +81,13 @@ void setup()
   }
 
   colorMode(HSB);
-  tree = new Tree(width / 2, height);
+  tree = new Tree(width / 2, height, 0);
   //trees.add(new Tree(width / 2, height));
 }
 
 void draw()
 {
+  translate(- width / 2, - height / 2, 100);
   background_hue = (skyHue + map(sun.Light, 0.0, 100.0, 170.0, 0.0)) % 360;
   background_satur = min(30.0, sun.Light);
   background_light = min(75.0, map(sun.Light + moon.Light, 0.0, 100.0, 5.0, 70.0));
@@ -89,6 +97,14 @@ void draw()
   background_light = min(82.0, sun.Light + moon.Light);
   */
   background(background_hue, background_satur, background_light);
+
+  push();
+  translate(0.0, height);
+  rotateX(PI / 2);
+  noStroke();
+  fill(background_hue, background_satur, max(0.0, background_light - 15.0));
+  rect(-width * 2, -height * 2, width * 5, height * 3);
+  pop();
 
   
   pmouseX = pclientX;
@@ -192,7 +208,7 @@ class HScrollbar {
       if(this.update)
       {
         tree.Del();
-        tree = new Tree(width / 2, height);
+        tree = new Tree(width / 2, height, 0);
       }
     }
   }
@@ -313,9 +329,12 @@ class Branch extends PhysicsObj
   {
     float x_offset_acc = (this.default_end.x - this.end.x) * this.friction * this.default_len;
     float y_offset_acc = (this.default_end.y - this.end.y) * this.friction * this.default_len;
+    float z_offset_acc = (this.default_end.z - this.end.z) * this.friction * this.default_len;
 
     this.AccX = wind_acc_x - this.SpeedX * (this.friction + airFriction) * this.default_len + x_offset_acc;
     this.AccY = wind_acc_y + gravity - this.SpeedY * (this.friction + airFriction) * this.default_len + y_offset_acc;
+    this.AccZ = wind_acc_z - this.SpeedZ * (this.friction + airFriction) * this.default_len + z_offset_acc;
+
     if(mousePressed)
     {
       float x_offset = this.end.x - mouseX;
@@ -330,8 +349,9 @@ class Branch extends PhysicsObj
   {
     this.SpeedX += this.AccX * dt / this.default_len;
     this.SpeedY += this.AccY * dt / this.default_len;
+    this.SpeedZ += this.AccZ * dt / this.default_len;
 
-    if(abs(this.SpeedX) > 10 || abs(this.SpeedY) > 10)
+    if(abs(this.SpeedX) > 10 || abs(this.SpeedY) > 10 || abs(this.SpeedZ) > 10)
     {
       for(int i = this.my_leaves.size() - 1; i >= 0; i--)
       {
@@ -343,7 +363,7 @@ class Branch extends PhysicsObj
     }
 
     PVector b_old_vector = PVector.sub(this.end, this.start);
-    PVector b_speed = new PVector(this.SpeedX * dt, this.SpeedY * dt);
+    PVector b_speed = new PVector(this.SpeedX * dt, this.SpeedY * dt, this.SpeedZ * dt);
     PVector b_end_speed = PVector.add(b_speed, this.end);
 
     PVector b_false_vector = PVector.sub(b_end_speed, this.start);
@@ -360,7 +380,7 @@ class Branch extends PhysicsObj
   public void drawSelf()
   {
     stroke(this.Color);
-    line(start.x, start.y, end.x, end.y);
+    line(start.x, start.y, start.z, end.x, end.y, end.z);
   }
 }
 /*
@@ -402,8 +422,6 @@ class Drop extends PhysicsObj
 {
   color Color = color(210.0, 100.0, 100.0, 50.0);
 
-  float z;
-
   int unique_number = 0;
 
   float alpha;
@@ -420,26 +438,27 @@ class Drop extends PhysicsObj
 
   public void reset()
   {
-    this.z = random(0.0, 20.0);
+    this.pos.z = random(0.0, 20.0);
 
     this.pos.x = random(-width / 2, 3 * width / 2);
-    this.pos.y = random(-100, -10000);
+    this.pos.y = random(-100, -1000);
 
-    this.Length = map(this.z, 0.0, 20.0, 4.0, 16.0);
-    this.alpha = map(this.z, 0.0, 20.0, 100.0, 255.0);
+    this.Length = map(this.pos.z, 0.0, 20.0, 4.0, 16.0);
+    this.alpha = map(this.pos.z, 0.0, 20.0, 100.0, 255.0);
 
-    float satur = map(this.z + sun.Light * 0.5, 0.0, 70.0, 5.0, 100.0);
-    float bright = map(this.z + min(100.0, sun.Light + moon.Light) * 0.5, 0.0, 70.0, 5.0, 100.0);
+    float satur = map(this.pos.z + sun.Light * 0.5, 0.0, 70.0, 5.0, 100.0);
+    float bright = map(this.pos.z + min(100.0, sun.Light + moon.Light) * 0.5, 0.0, 70.0, 5.0, 100.0);
     this.Color = color(210.0, satur, bright, this.alpha);
 
     this.SpeedX = 0;
-    this.SpeedY = this.z;
+    this.SpeedY = this.pos.z;
   }
 
   public void setAcceleration()
   {
     this.AccX = -this.SpeedX * airFriction * this.Length + wind_acc_x;
     this.AccY = gravity - this.SpeedY * airFriction * this.Length + wind_acc_y;
+    this.AccZ = - this.SpeedZ * airFriction * this.Length + wind_acc_z;
 
     if(mousePressed)
     {
@@ -455,9 +474,11 @@ class Drop extends PhysicsObj
   {
     this.SpeedX += this.AccX * dt / this.Length;
     this.SpeedY += this.AccY * dt / this.Length;
+    this.SpeedZ += this.AccZ * dt / this.Length;
 
     this.pos.x += this.SpeedX * dt;
     this.pos.y += this.SpeedY * dt;
+    this.pos.z += this.SpeedZ * dt;
   }
 
   public void stayInCanvas()
@@ -478,7 +499,7 @@ class Drop extends PhysicsObj
     if(this.unique_number <= random_drops)
     {
       stroke(this.Color, alpha);
-      line(this.pos.x, this.pos.y, this.pos.x + this.SpeedX, this.pos.y + this.Length + this.SpeedY);
+      line(this.pos.x, this.pos.y, this.pos.z, this.pos.x + this.SpeedX, this.pos.y + this.Length + this.SpeedY, this.pos.z);
     }
   }
 }
@@ -498,8 +519,9 @@ class Leaf extends PhysicsObj
   {
     if(falling)
     {
-      this.AccX = -this.SpeedX * airFriction * PI * pow(this.Size / 2, 2) + wind_acc_x;
+      this.AccX = - this.SpeedX * airFriction * PI * pow(this.Size / 2, 2) + wind_acc_x;
       this.AccY = gravity - this.SpeedY * airFriction * PI * pow(this.Size / 2, 2) + wind_acc_y;
+      this.AccZ = - this.SpeedZ * airFriction * PI * pow(this.Size / 2, 2) + wind_acc_z;
 
       if(mousePressed)
       {
@@ -516,9 +538,11 @@ class Leaf extends PhysicsObj
   {
     this.SpeedX += this.AccX * dt / (PI * pow(this.Size / 2, 2));
     this.SpeedY += this.AccY * dt / (PI * pow(this.Size / 2, 2));
+    this.SpeedZ += this.AccZ * dt / (PI * pow(this.Size / 2, 2));
 
     this.pos.x += this.SpeedX * dt;
     this.pos.y += this.SpeedY * dt;
+    this.pos.z += this.SpeedZ * dt;
   }
 
   public void stayInCanvas()
@@ -540,6 +564,11 @@ class Leaf extends PhysicsObj
       processees.remove(this);
       renderees.remove(this);
     }
+    if((this.pos.z - this.Size / 2) < 0.0 || (this.pos.z + this.Size / 2) > width)
+    {
+      processees.remove(this);
+      renderees.remove(this);
+    }
   }
 
   public void setColor()
@@ -551,7 +580,11 @@ class Leaf extends PhysicsObj
   {
     stroke(this.Color);
     fill(this.Color);
-    ellipse(this.pos.x, this.pos.y, this.Size, this.Size);
+    push();
+    translate(this.pos.x, this.pos.y, this.pos.z);
+    sphere(this.Size / 2);
+    pop();
+    // ellipse(this.pos.x, this.pos.y, this.pos.z, this.Size, this.Size);
 
     if(!falling && dist(this.pos.x, this.pos.y, mouseX, mouseY) < (this.Size / 2) + 2)
     {
@@ -572,6 +605,7 @@ class Moon
 {
   float X = width / 2;
   float Y = height * 1.5;
+  float Z = -70.0;
 
   float Light = 0.0;
   float Size = 100.0;
@@ -635,7 +669,11 @@ class Moon
 
     stroke(this.hue, this.satur, this.bright);
     fill(this.hue, this.satur, this.bright);
-    ellipse(this.X, this.Y, this.Size, this.Size);
+    push();
+    translate(this.X, this.Y, this.Z);
+    sphere(this.Size / 2);
+    pop();
+    // ellipse(this.X, this.Y, this.Size, this.Size);
   }
 }
 class PhysicsObj
@@ -646,9 +684,11 @@ class PhysicsObj
   // These variables are related to how the object moves. They should be private or restricted really.
   public float SpeedX = 0.0;
   public float SpeedY = 0.0;
+  public float SpeedZ = 0.0;
 
   public float AccX = 0.0;
   public float AccY = 0.0;
+  public float AccZ = 0.0;
 
   // The very color of our object. It's placed here so we can easily dynamically change it based on lightning.
   public color Color;
@@ -684,6 +724,7 @@ class PhysicsObj
   {
     this.AccX = 0.0;
     this.AccY = 0.0;
+    this.AccZ = 0.0;
   }
 
   // This function should be overwritten only when special features are added, such as falling off leaves, or such.
@@ -691,9 +732,11 @@ class PhysicsObj
   {
     this.SpeedX += this.AccX * dt;
     this.SpeedY += this.AccY * dt;
+    this.SpeedZ += this.AccZ * dt;
 
     this.pos.x += this.SpeedX * dt;
     this.pos.y += this.SpeedY * dt;
+    this.pos.z += this.SpeedZ * dt;
   }
 
   // This function should have contents of helping our object staying in canvas. If ever required.
@@ -784,6 +827,7 @@ class Sun
 {
   float X = width / 2;
   float Y = height * 1.5;
+  float Z = -70.0;
 
   float Light = 0.0;
   float Size = 100.0;
@@ -834,7 +878,11 @@ class Sun
 
     stroke(this.hue, this.satur, this.bright);
     fill(this.hue, this.satur, this.bright);
-    ellipse(this.X, this.Y, this.Size, this.Size);
+    push();
+    translate(this.X, this.Y, this.Z);
+    sphere(this.Size / 2);
+    pop();
+    // ellipse(this.X, this.Y, this.Size, this.Size);
   }
 }
 class Tree
@@ -848,9 +896,9 @@ class Tree
 
   int grown_times = 0;
 
-  public Tree(float x, float y)
+  public Tree(float x, float y, float z)
   {
-    this.root = new Branch(new PVector(x, y), new PVector(x, y - map(hs1.getPos(), 1.0, width, 1.0, 200.0)));
+    this.root = new Branch(new PVector(x, y, z), new PVector(x, y - map(hs1.getPos(), 1.0, width, 1.0, 200.0), z));
     this.root.source = this;
     this.branches.add(root);
     this.growing_branches.add(root);
